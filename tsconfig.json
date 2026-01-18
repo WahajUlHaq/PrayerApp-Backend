@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "esModuleInterop": true,
+    "strict": true,
+    "baseUrl": "./src",
+    "paths": {
+      "#controllers/*": ["controllers/*"],
+      "#services/*": ["services/*"],
+      "#routes/*": ["routes/*"],
+      "#models/*": ["models/*"],
+      "#utils/*": ["utils/*"],
+      "#configs/*": ["configs/*"],
+        "#interfaces/*": ["interfaces/*"],
+        "#validators/*": ["validators/*"],
+        "#cron/*": ["cron/*"]
+
+    },
+    "outDir": "./dist",
+    "skipLibCheck": true
+  },
+  "include": ["server.ts", "src/**/*.ts"],
+  "exclude": ["node_modules"]
+}
