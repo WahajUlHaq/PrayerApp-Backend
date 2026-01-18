@@ -2,6 +2,7 @@ import { Router } from "express";
 import path from "path";
 import fs from "fs";
 import multer from "multer";
+import { BannerModel } from "#models/banner";
 
 const BASE_ROUTE = "/banners";
 
@@ -44,25 +45,8 @@ const isSafeFilename = (name: string) => {
   return true;
 };
 
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => {
-    try {
-      ensureUploadsDir();
-      cb(null, uploadsRoot);
-    } catch (e) {
-      cb(e as Error, uploadsRoot);
-    }
-  },
-  filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname || "").slice(0, 10);
-    const safeExt = ext && ext.length <= 10 ? ext : "";
-    const random = Math.random().toString(36).slice(2, 10);
-    cb(null, `${Date.now()}-${random}${safeExt}`);
-  },
-});
-
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   fileFilter: (_req, file, cb) => {
     if (!file.mimetype?.startsWith("image/")) {
       return cb(new Error("Only image uploads are allowed"));
@@ -74,6 +58,13 @@ const upload = multer({
     files: 10,
   },
 });
+
+const createBannerFilename = (originalname: string) => {
+  const ext = path.extname(originalname || "").slice(0, 10);
+  const safeExt = ext && ext.length <= 10 ? ext : "";
+  const random = Math.random().toString(36).slice(2, 10);
+  return `${Date.now()}-${random}${safeExt}`;
+};
 
 const bannersRoutes = (router: Router) => {
   // Get current ticker text
@@ -90,73 +81,83 @@ const bannersRoutes = (router: Router) => {
   });
 
   // Upload multiple banner images (multipart/form-data, field: banners)
-  router.post(`${BASE_ROUTE}`, upload.array("banners", 10), (req, res) => {
+    router.post(`${BASE_ROUTE}`, upload.array("banners", 10), async (req, res) => {
     const files = (req.files as Express.Multer.File[]) || [];
-    const baseUrl = `${req.protocol}://${req.get("host")}`;
     const tickerText = normalizeTickerText((req as any).body?.tickerText);
 
     if (tickerText) {
       writeTickerText(tickerText);
     }
 
-    const data = files.map((f) => ({
-      filename: f.filename,
-      url: `${baseUrl}/api${BASE_ROUTE}/${encodeURIComponent(f.filename)}`,
-      size: f.size,
-      mimeType: f.mimetype,
-    }));
+    const created = await Promise.all(
+      files.map(async (f) => {
+        const filename = createBannerFilename(f.originalname || "image");
+        const dataBase64 = f.buffer.toString("base64");
+        const doc = await BannerModel.create({
+          filename,
+          mimeType: f.mimetype,
+          size: f.size,
+          dataBase64,
+        });
 
-    res.json({ tickerText: tickerText || readTickerText(), data });
+        return {
+          filename: doc.filename,
+          url: `data:${doc.mimeType};base64,${doc.dataBase64}`,
+          size: doc.size,
+          mimeType: doc.mimeType,
+        };
+      })
+    );
+
+    res.json({ tickerText: tickerText || readTickerText(), data: created });
   });
 
   // List banners saved on server
-  router.get(`${BASE_ROUTE}`, (_req, res) => {
-    ensureUploadsDir();
-    const entries = fs.readdirSync(uploadsRoot, { withFileTypes: true });
-    const baseUrl = `${_req.protocol}://${_req.get("host")}`;
+  router.get(`${BASE_ROUTE}`, async (_req, res) => {
     const tickerText = readTickerText();
-
-    const data = entries
-      .filter((e) => e.isFile())
-      .filter((e) => e.name !== path.basename(tickerFilePath))
-      .map((e) => ({
-        filename: e.name,
-        url: `${baseUrl}/api${BASE_ROUTE}/${encodeURIComponent(e.name)}`,
-      }));
+    const docs = await BannerModel.find({}).sort({ createdAt: -1 }).lean<any>();
+    const data = docs.map((d: any) => ({
+      filename: d.filename,
+      url: `data:${d.mimeType};base64,${d.dataBase64}`,
+      size: d.size,
+      mimeType: d.mimeType,
+    }));
 
     res.json({ tickerText, data });
   });
 
   // Get (serve) a banner image
-  router.get(`${BASE_ROUTE}/:filename`, (req, res) => {
+  router.get(`${BASE_ROUTE}/:filename`, async (req, res) => {
     const { filename } = req.params;
     if (!isSafeFilename(filename)) {
       return res.status(400).json({ message: "Invalid filename" });
     }
 
-    ensureUploadsDir();
-    const fullPath = path.join(uploadsRoot, filename);
-    if (!fs.existsSync(fullPath)) {
+    const doc = await BannerModel.findOne({ filename }).lean<any>();
+    if (!doc) {
       return res.status(404).json({ message: "Banner not found" });
     }
 
-    res.sendFile(fullPath);
+    res.json({
+      filename: doc.filename,
+      url: `data:${doc.mimeType};base64,${doc.dataBase64}`,
+      size: doc.size,
+      mimeType: doc.mimeType,
+    });
   });
 
   // Delete a banner image
-  router.delete(`${BASE_ROUTE}/:filename`, (req, res) => {
+  router.delete(`${BASE_ROUTE}/:filename`, async (req, res) => {
     const { filename } = req.params;
     if (!isSafeFilename(filename)) {
       return res.status(400).json({ message: "Invalid filename" });
     }
 
-    ensureUploadsDir();
-    const fullPath = path.join(uploadsRoot, filename);
-    if (!fs.existsSync(fullPath)) {
+    const deleted = await BannerModel.findOneAndDelete({ filename }).lean<any>();
+    if (!deleted) {
       return res.status(404).json({ message: "Banner not found" });
     }
 
-    fs.unlinkSync(fullPath);
     res.json({ message: "Deleted" });
   });
 };
