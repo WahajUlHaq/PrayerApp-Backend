@@ -12,7 +12,7 @@ import {
 import { CreatePageBody, UpdatePageBody } from "#interfaces/page";
 import path from "path";
 
-const SERVER_URL = process.env.SERVER_URL || "http://localhost:5000";
+const SERVER_URL = process.env.SERVER_URL
 
 // Helper to generate image URL from file path
 const getImageUrl = (filePath: string) => {
