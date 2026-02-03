@@ -2,5 +2,5 @@
   "watch": ["src"],
   "ext": "ts,json",
   "ignore": ["node_modules"],
-  "exec": "set NODE_OPTIONS=--max-old-space-size=2048 && ts-node -r tsconfig-paths/register server.ts"
+  "exec": "ts-node -r tsconfig-paths/register server.ts"
 }
