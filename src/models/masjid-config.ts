@@ -20,6 +20,7 @@ const MasjidConfigSchema = new Schema(
     alwaysDisplayIqamaahTime: { type: Boolean, required: false },
     displayTimerDuration: { type: Number, required: false },
     announcements: { type: String, required: false },
+    useMobileTTS: { type: Boolean, required: false, default: false },
   },
   { timestamps: true }
 );

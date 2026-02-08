@@ -10,6 +10,7 @@ import router from "#routes/index";
 import { startNamazTimingsDailyCron, refreshNamazTimingsFromMasjidConfig } from "#cron/namaz-timings-refresh";
 import { startPageCleanupCron } from "#cron/page-cleanup";
 import { cleanupExpiredPages } from "#services/page";
+import { createAnnouncement } from "#services/announcement";
 
 dotenv.config();
 
@@ -118,28 +119,69 @@ io.on("connection", (socket) => {
   });
   
   // Admin sends announce signal
-  socket.on("admin:announce", (data, callback) => {
+  socket.on("admin:announce", async (data, callback) => {
     console.log(`\n[socket] 📢 ============= ADMIN ANNOUNCE EVENT RECEIVED =============`);
     console.log(`[socket] Received from client: ${socket.id}`);
     console.log(`[socket] Data received:`, data);
     
-    // Broadcast to all clients (mobile apps)
-    console.log(`[socket] 📡 Broadcasting announce signal to all clients...`);
-    io.emit("client:announce", {
-      message: "Announcement from admin",
-      timestamp: new Date().toISOString(),
-      ...data
-    });
-    console.log(`[socket] ✅ Announce signal broadcast completed`);
-    console.log(`[socket] ============================================\n`);
-    
-    // Send acknowledgment to admin
-    if (callback) {
-      callback({
-        success: true,
-        message: "Announcement sent successfully",
-        timestamp: new Date().toISOString()
+    try {
+      console.log(`[socket] 📝 Fetching announcements from masjid config...`);
+      
+      // Create announcement and generate voice with ElevenLabs
+      // Text is fetched from masjid config inside createAnnouncement
+      const announcement = await createAnnouncement({ text: "" });
+      
+      console.log(`[socket] ✅ Announcement created:`, {
+        id: announcement._id,
+        hasAudio: !!announcement.audioUrl,
+        useMobileTTS: announcement.useMobileTTS,
+        error: announcement.elevenLabsError
       });
+      
+      // Broadcast to all clients (mobile apps)
+      console.log(`[socket] 📡 Broadcasting announce signal to all clients...`);
+      io.emit("client:announce", {
+        _id: announcement._id,
+        text: announcement.text,
+        audioUrl: announcement.audioUrl,
+        useMobileTTS: announcement.useMobileTTS,
+        message: "Announcement from admin",
+        timestamp: new Date().toISOString(),
+        ...data
+      });
+      console.log(`[socket] ✅ Announce signal broadcast completed`);
+      console.log(`[socket] ============================================\n`);
+      
+      // Send acknowledgment to admin
+      if (callback) {
+        callback({
+          success: true,
+          message: "Announcement sent successfully",
+          announcement: announcement,
+          timestamp: new Date().toISOString()
+        });
+      }
+    } catch (error: any) {
+      console.error(`[socket] ❌ Error creating announcement:`, error.message);
+      
+      // On error, send to mobile anyway with useMobileTTS flag
+      console.log(`[socket] ⚠️ Broadcasting announcement without ElevenLabs due to error`);
+      io.emit("client:announce", {
+        text: error.message || "Announcement error",
+        useMobileTTS: true,
+        message: error.message || "Error fetching announcements",
+        timestamp: new Date().toISOString(),
+        ...data
+      });
+      
+      if (callback) {
+        callback({
+          success: false,
+          message: "Announcement sent with mobile TTS fallback",
+          error: error.message,
+          timestamp: new Date().toISOString()
+        });
+      }
     }
   });
   

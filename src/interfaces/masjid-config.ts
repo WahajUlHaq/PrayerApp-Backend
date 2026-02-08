@@ -17,6 +17,7 @@ export interface MasjidConfigParams {
   alwaysDisplayIqamaahTime?: boolean;
   displayTimerDuration?: number;
   announcements?: string;
+  useMobileTTS?: boolean;
 }
 
 export type UpsertMasjidConfigBody = Omit<MasjidConfigParams, "year" | "month"> & {
