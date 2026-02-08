@@ -14,6 +14,9 @@ export interface MasjidConfigParams {
   latitudeAdjustmentMethod?: number;
   tune?: string;
   adjustment?: string;
+  alwaysDisplayIqamaahTime?: boolean;
+  displayTimerDuration?: number;
+  announcements?: string;
 }
 
 export type UpsertMasjidConfigBody = Omit<MasjidConfigParams, "year" | "month"> & {

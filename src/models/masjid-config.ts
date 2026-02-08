@@ -17,6 +17,9 @@ const MasjidConfigSchema = new Schema(
     latitudeAdjustmentMethod: { type: Number, required: false },
     tune: { type: String, required: false },
     adjustment: { type: Schema.Types.Mixed, required: false },
+    alwaysDisplayIqamaahTime: { type: Boolean, required: false },
+    displayTimerDuration: { type: Number, required: false },
+    announcements: { type: String, required: false },
   },
   { timestamps: true }
 );

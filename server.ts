@@ -54,7 +54,7 @@ io.on("connection", (socket) => {
   console.log(`[socket] 🟢 Client connected: ${socket.id}`);
   
   // Admin sends reload signal
-  socket.on("admin:reload", async (data) => {
+  socket.on("admin:reload", async (data, callback) => {
     console.log(`\n[socket] 🔄 ============= ADMIN RELOAD TRIGGERED =============`);
     console.log(`[socket] Data received:`, data);
     
@@ -83,6 +83,15 @@ io.on("connection", (socket) => {
       });
       console.log(`[socket] ✅ Reload signal broadcast completed`);
       console.log(`[socket] ============================================\n`);
+      
+      // Send acknowledgment to admin
+      if (callback) {
+        callback({
+          success: true,
+          message: "Reload signal sent successfully",
+          timestamp: new Date().toISOString()
+        });
+      }
     } catch (error: any) {
       console.error(`[socket] ❌ Error executing cron jobs:`, error?.message || error);
       console.error(`[socket] Stack:`, error?.stack);
@@ -95,6 +104,42 @@ io.on("connection", (socket) => {
         ...data
       });
       console.log(`[socket] ============================================\n`);
+      
+      // Send error acknowledgment to admin
+      if (callback) {
+        callback({
+          success: false,
+          message: "Reload signal sent with errors",
+          error: error?.message,
+          timestamp: new Date().toISOString()
+        });
+      }
+    }
+  });
+  
+  // Admin sends announce signal
+  socket.on("admin:announce", (data, callback) => {
+    console.log(`\n[socket] 📢 ============= ADMIN ANNOUNCE EVENT RECEIVED =============`);
+    console.log(`[socket] Received from client: ${socket.id}`);
+    console.log(`[socket] Data received:`, data);
+    
+    // Broadcast to all clients (mobile apps)
+    console.log(`[socket] 📡 Broadcasting announce signal to all clients...`);
+    io.emit("client:announce", {
+      message: "Announcement from admin",
+      timestamp: new Date().toISOString(),
+      ...data
+    });
+    console.log(`[socket] ✅ Announce signal broadcast completed`);
+    console.log(`[socket] ============================================\n`);
+    
+    // Send acknowledgment to admin
+    if (callback) {
+      callback({
+        success: true,
+        message: "Announcement sent successfully",
+        timestamp: new Date().toISOString()
+      });
     }
   });
   
@@ -106,6 +151,20 @@ io.on("connection", (socket) => {
     io.emit("admin:client-status", {
       clientId: socket.id,
       status: "refreshed",
+      timestamp: new Date().toISOString(),
+      ...data
+    });
+    console.log(`[socket] 📤 Status sent to admin dashboard\n`);
+  });
+  
+  // Mobile client confirms announcement received
+  socket.on("client:announced", (data) => {
+    console.log(`[socket] ✅ Client ${socket.id} confirmed announcement received`);
+    console.log(`[socket] Client data:`, data);
+    // Notify admin about client announcement status
+    io.emit("admin:client-status", {
+      clientId: socket.id,
+      status: "announced",
       timestamp: new Date().toISOString(),
       ...data
     });
