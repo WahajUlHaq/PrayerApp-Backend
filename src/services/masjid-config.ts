@@ -5,6 +5,20 @@ export const upsertMasjidConfig = async (
   data: MasjidConfigParams
 ): Promise<MasjidConfigParams> => {
   try {
+    if (data.method == 99) {
+      
+      console.log("Custom angles provided for method 99:", data.customAngles);
+      const splittedAngles = data.customAngles?.toString()?.split(",")
+      if (!splittedAngles || splittedAngles.length < 2) {
+        throw new Error("Custom angles must be a comma-separated string with at least 2 values for method 99");
+      }
+    }
+
+    if (data?.monthAdjustment && (data.monthAdjustment < -2 || data.monthAdjustment > 2)) {
+      throw new Error("Month adjustment must be between -2 and 2");
+    }
+
+    console.log("Upserting Masjid config with data:", data);
     const payload: MasjidConfigParams = {
       ...data,
       method: data.method ?? 0,

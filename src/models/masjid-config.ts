@@ -21,6 +21,8 @@ const MasjidConfigSchema = new Schema(
     displayTimerDuration: { type: Number, required: false },
     announcements: { type: String, required: false },
     useMobileTTS: { type: Boolean, required: false, default: false },
+    customAngles: { type: String, required: false },
+    monthAdjustment: { type: Number, required: false },
   },
   { timestamps: true }
 );

@@ -18,6 +18,8 @@ export interface MasjidConfigParams {
   displayTimerDuration?: number;
   announcements?: string;
   useMobileTTS?: boolean;
+  monthAdjustment?: number;
+  customAngles?: string; // Array of integers for custom angles
 }
 
 export type UpsertMasjidConfigBody = Omit<MasjidConfigParams, "year" | "month"> & {

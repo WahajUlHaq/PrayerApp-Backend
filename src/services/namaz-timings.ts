@@ -1,13 +1,14 @@
 import {
-    NamazTimingsFetchResponse,
+  NamazTimingsFetchResponse,
   NamazTimingsParams,
   NamazTimingsResponse,
 } from "#interfaces/namaz-timings";
+import { MasjidConfigModel } from "#models/masjid-config";
 import { NamazTimingModel } from "#models/namaz-timings";
 import { axiosWrapper } from "#utils/axios";
 
 export const fetchNamazTimings = async (
-  params: NamazTimingsParams
+  params: NamazTimingsParams,
 ): Promise<NamazTimingsResponse> => {
   try {
     const {
@@ -24,6 +25,16 @@ export const fetchNamazTimings = async (
       adjustment,
     } = params;
     const url = `${process.env.NAMAZ_TIME_API_BASE}/${year}/${month}`;
+
+    const getMasjidConfigQuery = await MasjidConfigModel.findOne({}).lean();
+
+    const customAngle1 = getMasjidConfigQuery?.customAngles
+      ? getMasjidConfigQuery.customAngles.split(",")[0]
+      : null;
+    const customAngle2 = getMasjidConfigQuery?.customAngles
+      ? getMasjidConfigQuery.customAngles.split(",")[1]
+      : null;
+
     const query = {
       address,
       method,
@@ -32,11 +43,17 @@ export const fetchNamazTimings = async (
       midnightMode,
       calendarMethod,
       latitudeAdjustmentMethod,
+      adjustment: getMasjidConfigQuery?.monthAdjustment ?? 0,
       tune,
-      adjustment,
+      ...(method == 99 && {
+        methodSettings: `${customAngle1}, null, ${customAngle2}`,
+      }),
+      // methodSettings:
       //   timezonestring: "UTC",
       //   iso8601: true,
     };
+
+    console.log("Fetching Namaz timings with query:", query);
 
     const res = await axiosWrapper.get<NamazTimingsResponse>(url, query);
 
@@ -48,7 +65,7 @@ export const fetchNamazTimings = async (
         address,
         data: res.data.data,
       },
-      { upsert: true, new: true }
+      { upsert: true, new: true },
     );
 
     return res.data as NamazTimingsResponse;
@@ -58,22 +75,21 @@ export const fetchNamazTimings = async (
   }
 };
 
-export const getNamazTimings = async (
-): Promise<NamazTimingsFetchResponse> => {
+export const getNamazTimings = async (): Promise<NamazTimingsFetchResponse> => {
   try {
-    const record = await NamazTimingModel.findOne({}).sort({ updatedAt: -1 }).lean<any>();
+    const record = await NamazTimingModel.findOne({})
+      .sort({ updatedAt: -1 })
+      .lean<any>();
 
     if (!record) {
-        throw new Error("No Namaz timings found in the database");
+      throw new Error("No Namaz timings found in the database");
     }
 
     return {
       data: Array.isArray(record.data) ? record.data : [],
     } as NamazTimingsFetchResponse;
-    } catch (err: any) {
+  } catch (err: any) {
     console.error("Error retrieving Namaz timings from DB:", err);
     throw new Error(err.message || "Failed to retrieve Namaz timings");
-    }   
+  }
 };
-
-        
